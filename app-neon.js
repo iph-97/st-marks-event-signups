@@ -570,8 +570,32 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
     location: party?.location || '',
     maxGuests: party?.max_guests || 8,
     kidFriendly: party?.kid_friendly || false,
-    description: party?.description || ''
+    description: party?.description || '',
+    slots: party?.slots || []
   });
+
+  const addSlot = () => {
+    setFormData({
+      ...formData,
+      slots: [...formData.slots, { id: Date.now().toString(), label: '', filled: false }]
+    });
+  };
+
+  const updateSlot = (id, label) => {
+    setFormData({
+      ...formData,
+      slots: formData.slots.map(slot => 
+        slot.id === id ? { ...slot, label } : slot
+      )
+    });
+  };
+
+  const removeSlot = (id) => {
+    setFormData({
+      ...formData,
+      slots: formData.slots.filter(slot => slot.id !== id)
+    });
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -590,8 +614,11 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
         return;
       }
     }
+
+    // Filter out empty slots
+    const cleanedSlots = formData.slots.filter(slot => slot.label.trim() !== '');
     
-    onSave(formData);
+    onSave({ ...formData, slots: cleanedSlots });
   };
 
   return (
@@ -685,6 +712,52 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
         </label>
       </div>
 
+      {/* Slot Management Section */}
+      <div className="mb-4 p-4 bg-gray-50 rounded border border-gray-200">
+        <div className="flex justify-between items-center mb-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Potluck Slots (Optional)
+          </label>
+          <button
+            type="button"
+            onClick={addSlot}
+            className="text-sm text-red-700 hover:text-red-800 flex items-center gap-1"
+          >
+            <Plus size={16} />
+            Add Slot
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mb-3">
+          Create labeled slots for potluck contributions (e.g., "Main Dish", "Salad", "Drinks")
+        </p>
+
+        {formData.slots.length === 0 ? (
+          <p className="text-sm text-gray-400 italic">No slots created. Guests will sign up for general attendance.</p>
+        ) : (
+          <div className="space-y-2">
+            {formData.slots.map((slot, index) => (
+              <div key={slot.id} className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={slot.label}
+                  onChange={(e) => updateSlot(slot.id, e.target.value)}
+                  placeholder={`Slot ${index + 1} (e.g., "Main Dish")`}
+                  className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-red-700 focus:border-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeSlot(slot.id)}
+                  className="text-red-600 hover:text-red-700 p-2"
+                  title="Remove slot"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">Additional Details (Optional)</label>
         <textarea
@@ -719,11 +792,27 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
 
 const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
   const [showSignup, setShowSignup] = useState(false);
-  const [signupForm, setSignupForm] = useState({ name: '', email: '', dietary: '' });
+  const [signupForm, setSignupForm] = useState({ name: '', email: '', dietary: '', slotId: null });
 
   const partyDate = new Date(party.date);
   const isPast = partyDate < new Date();
-  const spotsLeft = party.max_guests - (party.guests?.length || 0);
+  
+  // Parse slots if they're a string
+  const slots = typeof party.slots === 'string' ? JSON.parse(party.slots) : (party.slots || []);
+  const guests = typeof party.guests === 'string' ? JSON.parse(party.guests) : (party.guests || []);
+  
+  // Calculate available slots
+  const totalSlots = party.max_guests;
+  const labeledSlots = slots.length;
+  const generalSlots = totalSlots - labeledSlots;
+  
+  // Track which slots are filled
+  const filledSlots = guests.filter(g => g.slotId).map(g => g.slotId);
+  const availableSlots = slots.filter(s => !filledSlots.includes(s.id));
+  const generalGuestsCount = guests.filter(g => !g.slotId).length;
+  const generalSlotsAvailable = generalSlots - generalGuestsCount;
+  
+  const spotsLeft = availableSlots.length + generalSlotsAvailable;
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -733,24 +822,28 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
       return;
     }
 
-    if ((party.guests?.length || 0) >= party.max_guests) {
-      alert('Sorry, this party is full!');
+    // Check if selected slot is still available
+    if (signupForm.slotId && filledSlots.includes(signupForm.slotId)) {
+      alert('Sorry, that slot was just taken! Please choose another.');
       return;
     }
 
     const newGuest = {
       id: Date.now().toString(),
-      ...signupForm,
+      name: signupForm.name,
+      email: signupForm.email,
+      dietary: signupForm.dietary,
+      slotId: signupForm.slotId || null,
       signedUpAt: new Date().toISOString()
     };
 
     const updatedParty = {
       ...party,
-      guests: [...(party.guests || []), newGuest]
+      guests: [...guests, newGuest]
     };
 
     await onUpdate(updatedParty);
-    setSignupForm({ name: '', email: '', dietary: '' });
+    setSignupForm({ name: '', email: '', dietary: '', slotId: null });
     setShowSignup(false);
     alert('Successfully signed up! You\'ll receive reminders before the party.');
   };
@@ -760,9 +853,14 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
     
     const updatedParty = {
       ...party,
-      guests: (party.guests || []).filter(g => g.id !== guestId)
+      guests: guests.filter(g => g.id !== guestId)
     };
     await onUpdate(updatedParty);
+  };
+
+  const getSlotLabel = (slotId) => {
+    const slot = slots.find(s => s.id === slotId);
+    return slot ? slot.label : null;
   };
 
   return (
@@ -795,10 +893,15 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
         
         <div className="flex flex-wrap items-center gap-4 text-sm">
           <span>📍 {party.location}</span>
-          <span>👥 {party.guests?.length || 0}/{party.max_guests} guests</span>
+          <span>👥 {guests.length}/{party.max_guests} guests</span>
           {party.kid_friendly && (
             <span className="bg-white bg-opacity-20 px-2 py-1 rounded text-xs font-medium">
               👶 Kid-friendly
+            </span>
+          )}
+          {slots.length > 0 && (
+            <span className="bg-white bg-opacity-20 px-2 py-1 rounded text-xs font-medium">
+              🍽️ Potluck slots
             </span>
           )}
         </div>
@@ -809,6 +912,33 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
           <p className="text-gray-600 mb-4 italic">{party.description}</p>
         )}
 
+        {/* Show Potluck Slots if they exist */}
+        {slots.length > 0 && (
+          <div className="mb-4 p-4 bg-blue-50 rounded border border-blue-200">
+            <h4 className="font-semibold text-gray-800 mb-2">Potluck Slots</h4>
+            <div className="grid md:grid-cols-2 gap-2">
+              {slots.map(slot => {
+                const guest = guests.find(g => g.slotId === slot.id);
+                return (
+                  <div key={slot.id} className="flex items-center justify-between bg-white p-2 rounded border border-gray-200">
+                    <span className="text-sm font-medium text-gray-700">{slot.label}</span>
+                    {guest ? (
+                      <span className="text-xs text-green-600 font-medium">✓ {guest.name}</span>
+                    ) : (
+                      <span className="text-xs text-gray-400">Available</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {generalSlots > 0 && (
+              <p className="text-xs text-gray-500 mt-2">
+                Plus {generalSlots} general {generalSlots === 1 ? 'spot' : 'spots'} ({generalSlotsAvailable} available)
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2">
             <h4 className="font-semibold text-gray-800">Guest List</h4>
@@ -817,28 +947,38 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
             )}
           </div>
 
-          {(party.guests?.length || 0) === 0 ? (
+          {guests.length === 0 ? (
             <p className="text-gray-400 text-sm">No guests signed up yet</p>
           ) : (
             <div className="space-y-2">
-              {(party.guests || []).map(guest => (
-                <div key={guest.id} className="flex justify-between items-start bg-gray-50 p-3 rounded border border-gray-200">
-                  <div>
-                    <p className="font-medium text-gray-800">{guest.name}</p>
-                    <p className="text-sm text-gray-500">{guest.email}</p>
-                    {guest.dietary && (
-                      <p className="text-sm text-gray-600 mt-1">Dietary: {guest.dietary}</p>
-                    )}
+              {guests.map(guest => {
+                const slotLabel = getSlotLabel(guest.slotId);
+                return (
+                  <div key={guest.id} className="flex justify-between items-start bg-gray-50 p-3 rounded border border-gray-200">
+                    <div>
+                      <p className="font-medium text-gray-800">
+                        {guest.name}
+                        {slotLabel && (
+                          <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            {slotLabel}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-sm text-gray-500">{guest.email}</p>
+                      {guest.dietary && (
+                        <p className="text-sm text-gray-600 mt-1">Dietary: {guest.dietary}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => removeGuest(guest.id)}
+                      className="text-red-700 hover:text-red-800 p-1"
+                      title="Remove guest"
+                    >
+                      <X size={18} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => removeGuest(guest.id)}
-                    className="text-red-700 hover:text-red-800 p-1"
-                    title="Remove guest"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -855,6 +995,27 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
             ) : (
               <form onSubmit={handleSignup} className="bg-gray-50 p-4 rounded border border-gray-200">
                 <h5 className="font-semibold text-gray-800 mb-3">Sign Up</h5>
+                
+                {/* Slot Selection */}
+                {availableSlots.length > 0 && (
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Choose a potluck slot (or leave blank for general attendance)
+                    </label>
+                    <select
+                      value={signupForm.slotId || ''}
+                      onChange={(e) => setSignupForm({ ...signupForm, slotId: e.target.value || null })}
+                      className="w-full border border-gray-300 rounded px-3 py-2 mb-2"
+                    >
+                      <option value="">General attendance</option>
+                      {availableSlots.map(slot => (
+                        <option key={slot.id} value={slot.id}>
+                          {slot.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 
                 <input
                   type="text"
