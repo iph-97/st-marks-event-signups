@@ -1,0 +1,8 @@
+{
+  "name": "st-marks-event-signups",
+  "version": "1.0.0",
+  "description": "St. Mark's Event Sign Up System with Neon Database",
+  "dependencies": {
+    "pg": "^8.11.3"
+  }
+}
