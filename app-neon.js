@@ -979,17 +979,17 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
   
   const spotsLeft = availableSlots.length + generalSlotsAvailable;
 
-  // Debug logging
-  console.log('Slot calculation:', {
-    totalSlots,
-    labeledSlots,
-    generalSlots,
-    filledSlotIds,
-    availableSlots: availableSlots.length,
-    generalGuestsCount,
-    generalSlotsAvailable,
-    spotsLeft
-  });
+  // Debug logging - always runs when component renders
+  React.useEffect(() => {
+    console.log('=== PARTY CARD DEBUG ===');
+    console.log('Party:', party.title || party.date);
+    console.log('Total slots:', totalSlots);
+    console.log('Labeled slots:', labeledSlots);
+    console.log('General slots:', generalSlots);
+    console.log('General slots available:', generalSlotsAvailable);
+    console.log('Slots array:', slots);
+    console.log('=======================');
+  }, []);
 
   const handleSlotToggle = (slotId) => {
     const newSelected = signupForm.selectedSlots.includes(slotId)
@@ -1226,6 +1226,11 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
             ) : (
               <form onSubmit={handleSignup} className="bg-gray-50 p-4 rounded border border-gray-200">
                 <h5 className="font-semibold text-gray-800 mb-3">Sign Up</h5>
+                
+                {/* DEBUG INFO - Remove after testing */}
+                <div className="mb-3 p-2 bg-yellow-100 border border-yellow-300 rounded text-xs">
+                  <strong>Debug:</strong> Total slots: {totalSlots} | Labeled: {labeledSlots} | General: {generalSlots} | Available general: {generalSlotsAvailable}
+                </div>
                 
                 {/* All Slots - Both Labeled and General */}
                 <div className="mb-3">
