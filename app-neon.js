@@ -979,6 +979,18 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
   
   const spotsLeft = availableSlots.length + generalSlotsAvailable;
 
+  // Debug logging
+  console.log('Slot calculation:', {
+    totalSlots,
+    labeledSlots,
+    generalSlots,
+    filledSlotIds,
+    availableSlots: availableSlots.length,
+    generalGuestsCount,
+    generalSlotsAvailable,
+    spotsLeft
+  });
+
   const handleSlotToggle = (slotId) => {
     const newSelected = signupForm.selectedSlots.includes(slotId)
       ? signupForm.selectedSlots.filter(id => id !== slotId)
