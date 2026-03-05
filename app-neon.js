@@ -979,17 +979,15 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
   
   const spotsLeft = availableSlots.length + generalSlotsAvailable;
 
-  // Debug logging - always runs when component renders
-  React.useEffect(() => {
-    console.log('=== PARTY CARD DEBUG ===');
-    console.log('Party:', party.title || party.date);
-    console.log('Total slots:', totalSlots);
-    console.log('Labeled slots:', labeledSlots);
-    console.log('General slots:', generalSlots);
-    console.log('General slots available:', generalSlotsAvailable);
-    console.log('Slots array:', slots);
-    console.log('=======================');
-  }, []);
+  // Simple debug logging
+  console.log('=== PARTY CARD DEBUG ===', {
+    party: party.title || party.date,
+    totalSlots,
+    labeledSlots,
+    generalSlots,
+    generalSlotsAvailable,
+    slots
+  });
 
   const handleSlotToggle = (slotId) => {
     const newSelected = signupForm.selectedSlots.includes(slotId)
