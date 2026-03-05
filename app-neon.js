@@ -1,5 +1,14 @@
 const { useState, useEffect } = React;
-const { Calendar, Users, Mail, Plus, Trash2, Edit2, Check, X } = lucide;
+const { Calendar, Users, Mail, Plus, Trash2, Edit2, Check, X, Copy } = lucide;
+
+// Date formatting helper
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${month}/${day}/${year}`;
+};
 
 // API helper functions
 const api = {
@@ -202,6 +211,16 @@ const DinnerPartyManager = () => {
     setCurrentSeries(seriesData);
   };
 
+  const duplicateParty = (party) => {
+    // Pre-fill form with all data from original party except date
+    setEditingParty({
+      ...party,
+      id: null, // Clear ID so it creates a new party
+      date: '', // Clear date so user must choose new one
+      guests: [] // Clear guests for new party
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -302,7 +321,7 @@ const DinnerPartyManager = () => {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-600 text-sm mb-2">
-                Event window: {currentSeries.start_date} - {currentSeries.end_date}
+                Event window: {formatDate(currentSeries.start_date)} - {formatDate(currentSeries.end_date)}
               </p>
             </div>
             <button
@@ -320,7 +339,7 @@ const DinnerPartyManager = () => {
           className="mb-6 bg-red-700 text-white px-6 py-3 rounded hover:bg-red-800 transition flex items-center gap-2 shadow-md"
         >
           <Plus size={20} />
-          Sign Up to Host a Dinner Party
+          Sign Up to Host an Event
         </button>
 
         {showAddParty && (
@@ -343,7 +362,7 @@ const DinnerPartyManager = () => {
           {parties.length === 0 ? (
             <div className="bg-white rounded shadow-md p-12 text-center border border-gray-200">
               <Calendar className="mx-auto text-gray-400 mb-4" size={48} />
-              <p className="text-gray-600 text-lg font-serif">No dinner parties scheduled yet</p>
+              <p className="text-gray-600 text-lg font-serif">No events scheduled yet</p>
               <p className="text-gray-500">Click the button above to host the first one!</p>
             </div>
           ) : (
@@ -354,6 +373,7 @@ const DinnerPartyManager = () => {
                 onDelete={() => deleteParty(party.id)}
                 onEdit={() => setEditingParty(party)}
                 onUpdate={saveParty}
+                onDuplicate={duplicateParty}
               />
             ))
           )}
@@ -423,7 +443,7 @@ const SeriesForm = ({ series, onSave, onCancel }) => {
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded shadow-md p-6 mb-6 max-w-2xl mx-auto border border-gray-200">
       <h2 className="text-2xl font-serif mb-2 text-gray-800">{series ? 'Edit' : 'Create New'} Event Series</h2>
-      <p className="text-gray-600 mb-4">Set up a series of dinner parties with a specific time window</p>
+      <p className="text-gray-600 mb-4">Set up a series of events with a specific time window</p>
       
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">Series Title *</label>
@@ -473,7 +493,7 @@ const SeriesForm = ({ series, onSave, onCancel }) => {
       </div>
 
       <p className="text-sm text-gray-500 mb-4">
-        Hosts will only be able to schedule dinners within this date range
+        Hosts will only be able to schedule events within this date range
       </p>
 
       <div className="flex gap-3">
@@ -554,7 +574,7 @@ const SeriesCard = ({ series, onSelect, onEdit, onDelete }) => {
         <div className="text-sm text-gray-500">
           <p className="flex items-center gap-2 mb-1">
             <Calendar size={16} />
-            {series.start_date} - {series.end_date}
+            {formatDate(series.start_date)} - {formatDate(series.end_date)}
           </p>
         </div>
       </div>
@@ -564,6 +584,7 @@ const SeriesCard = ({ series, onSelect, onEdit, onDelete }) => {
 
 const PartyForm = ({ party, series, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
+    title: party?.title || '',
     date: party?.date || '',
     host: party?.host || '',
     hostEmail: party?.host_email || '',
@@ -610,7 +631,7 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
       const seriesEnd = new Date(series.end_date);
       
       if (partyDate < seriesStart || partyDate > seriesEnd) {
-        alert(`Party date must be between ${series.start_date} and ${series.end_date}`);
+        alert(`Event date must be between ${formatDate(series.start_date)} and ${formatDate(series.end_date)}`);
         return;
       }
     }
@@ -623,9 +644,20 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded shadow-md p-6 mb-6 border border-gray-200">
-      <h2 className="text-2xl font-serif mb-2 text-gray-800">{party ? 'Edit' : 'Host a'} Dinner Party</h2>
-      <p className="text-gray-600 mb-4">Sign up to host a dinner party at your home</p>
+      <h2 className="text-2xl font-serif mb-2 text-gray-800">{party ? 'Edit' : 'Host an'} Event</h2>
+      <p className="text-gray-600 mb-4">Sign up to host an event at your home</p>
       
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Event Title (Optional)</label>
+        <input
+          type="text"
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          placeholder="e.g., 'Summer BBQ' or 'Game Night'"
+          className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-red-700 focus:border-transparent"
+        />
+      </div>
+
       <div className="grid md:grid-cols-2 gap-4 mb-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Your Name *</label>
@@ -666,7 +698,7 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
           />
           {series && (
             <p className="text-xs text-gray-500 mt-1">
-              Must be between {series.start_date} - {series.end_date}
+              Must be between {formatDate(series.start_date)} - {formatDate(series.end_date)}
             </p>
           )}
         </div>
@@ -790,14 +822,22 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
   );
 };
 
-const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
+// NEW PartyCard Component with Multi-Slot Signup and Duplicate Button
+// Replace the existing PartyCard in app-neon.js with this version
+
+const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate }) => {
   const [showSignup, setShowSignup] = useState(false);
-  const [signupForm, setSignupForm] = useState({ name: '', email: '', dietary: '', slotId: null });
+  const [signupForm, setSignupForm] = useState({ 
+    email: '', 
+    dietary: '',
+    selectedSlots: [],  // Array of slot IDs
+    slotNames: {}       // {slotId: "Person Name"}
+  });
 
   const partyDate = new Date(party.date);
   const isPast = partyDate < new Date();
   
-  // Parse slots if they're a string
+  // Parse slots and guests
   const slots = typeof party.slots === 'string' ? JSON.parse(party.slots) : (party.slots || []);
   const guests = typeof party.guests === 'string' ? JSON.parse(party.guests) : (party.guests || []);
   
@@ -807,49 +847,82 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
   const generalSlots = totalSlots - labeledSlots;
   
   // Track which slots are filled
-  const filledSlots = guests.filter(g => g.slotId).map(g => g.slotId);
-  const availableSlots = slots.filter(s => !filledSlots.includes(s.id));
+  const filledSlotIds = guests.filter(g => g.slotId).map(g => g.slotId);
+  const availableSlots = slots.filter(s => !filledSlotIds.includes(s.id));
   const generalGuestsCount = guests.filter(g => !g.slotId).length;
   const generalSlotsAvailable = generalSlots - generalGuestsCount;
   
   const spotsLeft = availableSlots.length + generalSlotsAvailable;
 
+  const handleSlotToggle = (slotId) => {
+    const newSelected = signupForm.selectedSlots.includes(slotId)
+      ? signupForm.selectedSlots.filter(id => id !== slotId)
+      : [...signupForm.selectedSlots, slotId];
+    
+    setSignupForm({ ...signupForm, selectedSlots: newSelected });
+  };
+
+  const handleSlotNameChange = (slotId, name) => {
+    setSignupForm({
+      ...signupForm,
+      slotNames: { ...signupForm.slotNames, [slotId]: name }
+    });
+  };
+
   const handleSignup = async (e) => {
     e.preventDefault();
     
-    if (!signupForm.name || !signupForm.email) {
-      alert('Please enter your name and email');
+    if (!signupForm.email) {
+      alert('Please enter an email address');
       return;
     }
 
-    // Check if selected slot is still available
-    if (signupForm.slotId && filledSlots.includes(signupForm.slotId)) {
-      alert('Sorry, that slot was just taken! Please choose another.');
-      return;
+    // Validate all selected slots have names
+    for (const slotId of signupForm.selectedSlots) {
+      if (!signupForm.slotNames[slotId] || !signupForm.slotNames[slotId].trim()) {
+        alert('Please enter a name for each selected slot');
+        return;
+      }
     }
 
-    const newGuest = {
-      id: Date.now().toString(),
-      name: signupForm.name,
+    // Create a guest entry for each selected slot
+    const newGuests = signupForm.selectedSlots.map(slotId => ({
+      id: `${Date.now()}-${slotId}`,
+      name: signupForm.slotNames[slotId],
       email: signupForm.email,
       dietary: signupForm.dietary,
-      slotId: signupForm.slotId || null,
+      slotId: slotId,
       signedUpAt: new Date().toISOString()
-    };
+    }));
+
+    // If no slots selected, create one general attendance guest
+    if (newGuests.length === 0) {
+      const generalName = prompt('Please enter your name:');
+      if (!generalName) return;
+      
+      newGuests.push({
+        id: Date.now().toString(),
+        name: generalName,
+        email: signupForm.email,
+        dietary: signupForm.dietary,
+        slotId: null,
+        signedUpAt: new Date().toISOString()
+      });
+    }
 
     const updatedParty = {
       ...party,
-      guests: [...guests, newGuest]
+      guests: [...guests, ...newGuests]
     };
 
     await onUpdate(updatedParty);
-    setSignupForm({ name: '', email: '', dietary: '', slotId: null });
+    setSignupForm({ email: '', dietary: '', selectedSlots: [], slotNames: {} });
     setShowSignup(false);
-    alert('Successfully signed up! You\'ll receive reminders before the party.');
+    alert('Successfully signed up! You\'ll receive reminders before the event.');
   };
 
   const removeGuest = async (guestId) => {
-    if (!confirm('Remove this guest from the party?')) return;
+    if (!confirm('Remove this guest from the event?')) return;
     
     const updatedParty = {
       ...party,
@@ -868,23 +941,33 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
       <div className="bg-slate-800 text-white p-6">
         <div className="flex justify-between items-start mb-2">
           <div>
-            <h3 className="text-2xl font-serif mb-1">
-              {partyDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            {party.title && (
+              <h2 className="text-3xl font-serif mb-1">{party.title}</h2>
+            )}
+            <h3 className={`${party.title ? 'text-xl' : 'text-2xl'} font-serif ${party.title ? 'text-gray-300' : 'mb-1'}`}>
+              {formatDate(party.date)}
             </h3>
             <p className="text-gray-300">Hosted by {party.host}{party.host_email ? ` (${party.host_email})` : ''}</p>
           </div>
           <div className="flex gap-2">
             <button
+              onClick={() => onDuplicate(party)}
+              className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded transition"
+              title="Duplicate event"
+            >
+              <Copy size={18} />
+            </button>
+            <button
               onClick={onEdit}
               className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded transition"
-              title="Edit party"
+              title="Edit event"
             >
               <Edit2 size={18} />
             </button>
             <button
               onClick={onDelete}
               className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded transition"
-              title="Delete party"
+              title="Delete event"
             >
               <Trash2 size={18} />
             </button>
@@ -990,45 +1073,52 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
                 onClick={() => setShowSignup(true)}
                 className="w-full bg-red-700 text-white py-3 rounded hover:bg-red-800 transition font-medium"
               >
-                Sign Up for This Dinner
+                Sign Up for This Event
               </button>
             ) : (
               <form onSubmit={handleSignup} className="bg-gray-50 p-4 rounded border border-gray-200">
                 <h5 className="font-semibold text-gray-800 mb-3">Sign Up</h5>
                 
-                {/* Slot Selection */}
+                {/* Multi-Slot Selection */}
                 {availableSlots.length > 0 && (
                   <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Choose a potluck slot (or leave blank for general attendance)
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select potluck slot(s):
                     </label>
-                    <select
-                      value={signupForm.slotId || ''}
-                      onChange={(e) => setSignupForm({ ...signupForm, slotId: e.target.value || null })}
-                      className="w-full border border-gray-300 rounded px-3 py-2 mb-2"
-                    >
-                      <option value="">General attendance</option>
-                      {availableSlots.map(slot => (
-                        <option key={slot.id} value={slot.id}>
-                          {slot.label}
-                        </option>
-                      ))}
-                    </select>
+                    {availableSlots.map(slot => (
+                      <div key={slot.id} className="mb-3">
+                        <label className="flex items-start gap-2 cursor-pointer mb-1">
+                          <input
+                            type="checkbox"
+                            checked={signupForm.selectedSlots.includes(slot.id)}
+                            onChange={() => handleSlotToggle(slot.id)}
+                            className="mt-1 w-4 h-4 text-red-700 border-gray-300 rounded focus:ring-red-700"
+                          />
+                          <span className="text-sm font-medium text-gray-700">{slot.label}</span>
+                        </label>
+                        {signupForm.selectedSlots.includes(slot.id) && (
+                          <input
+                            type="text"
+                            placeholder="Name for this slot *"
+                            value={signupForm.slotNames[slot.id] || ''}
+                            onChange={(e) => handleSlotNameChange(slot.id, e.target.value)}
+                            className="ml-6 w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                            required
+                          />
+                        )}
+                      </div>
+                    ))}
+                    {generalSlotsAvailable > 0 && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        Leave all unchecked for general attendance (no specific slot)
+                      </p>
+                    )}
                   </div>
                 )}
                 
                 <input
-                  type="text"
-                  placeholder="Your name *"
-                  value={signupForm.name}
-                  onChange={(e) => setSignupForm({ ...signupForm, name: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 mb-2"
-                  required
-                />
-                
-                <input
                   type="email"
-                  placeholder="Your email *"
+                  placeholder="Email (for all people) *"
                   value={signupForm.email}
                   onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })}
                   className="w-full border border-gray-300 rounded px-3 py-2 mb-2"
@@ -1052,7 +1142,10 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowSignup(false)}
+                    onClick={() => {
+                      setShowSignup(false);
+                      setSignupForm({ email: '', dietary: '', selectedSlots: [], slotNames: {} });
+                    }}
                     className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition"
                   >
                     Cancel
@@ -1065,20 +1158,19 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate }) => {
 
         {isPast && (
           <div className="bg-gray-100 text-gray-600 py-2 px-4 rounded text-center">
-            This dinner has already occurred
+            This event has already occurred
           </div>
         )}
 
         {!isPast && spotsLeft === 0 && (
           <div className="bg-yellow-50 text-yellow-800 py-2 px-4 rounded text-center font-medium border border-yellow-200">
-            This party is full
+            This event is full
           </div>
         )}
       </div>
     </div>
   );
 };
-
 // Render the app
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(React.createElement(DinnerPartyManager));
