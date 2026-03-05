@@ -1,5 +1,5 @@
 const { useState, useEffect } = React;
-const { Calendar, Users, Mail, Plus, Trash2, Edit2, Check, X, Copy } = lucide;
+const { Calendar, Users, Mail, Plus, Trash2, Edit2, Check, X } = lucide;
 
 // Date formatting helper
 const formatDate = (dateString) => {
@@ -952,10 +952,10 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate }) => {
           <div className="flex gap-2">
             <button
               onClick={() => onDuplicate(party)}
-              className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded transition"
+              className="bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-2 rounded transition text-sm font-medium"
               title="Duplicate event"
             >
-              <Copy size={18} />
+              ⧉
             </button>
             <button
               onClick={onEdit}
