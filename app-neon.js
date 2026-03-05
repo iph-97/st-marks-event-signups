@@ -979,16 +979,6 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
   
   const spotsLeft = availableSlots.length + generalSlotsAvailable;
 
-  // Simple debug logging
-  console.log('=== PARTY CARD DEBUG ===', {
-    party: party.title || party.date,
-    totalSlots,
-    labeledSlots,
-    generalSlots,
-    generalSlotsAvailable,
-    slots
-  });
-
   const handleSlotToggle = (slotId) => {
     const newSelected = signupForm.selectedSlots.includes(slotId)
       ? signupForm.selectedSlots.filter(id => id !== slotId)
@@ -1224,11 +1214,6 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
             ) : (
               <form onSubmit={handleSignup} className="bg-gray-50 p-4 rounded border border-gray-200">
                 <h5 className="font-semibold text-gray-800 mb-3">Sign Up</h5>
-                
-                {/* DEBUG INFO - Remove after testing */}
-                <div className="mb-3 p-2 bg-yellow-100 border border-yellow-300 rounded text-xs">
-                  <strong>Debug:</strong> Total slots: {totalSlots} | Labeled: {labeledSlots} | General: {generalSlots} | Available general: {generalSlotsAvailable}
-                </div>
                 
                 {/* All Slots - Both Labeled and General */}
                 <div className="mb-3">
