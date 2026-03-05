@@ -10,6 +10,97 @@ const formatDate = (dateString) => {
   return `${month}/${day}/${year}`;
 };
 
+// EmailJS Configuration - UPDATE THESE VALUES after EmailJS setup
+const EMAILJS_CONFIG = {
+  serviceId: 'YOUR_SERVICE_ID',           // From EmailJS dashboard
+  publicKey: 'YOUR_PUBLIC_KEY',           // From EmailJS dashboard
+  templates: {
+    guestConfirmation: 'template_guest_confirmation',
+    hostNewSignup: 'template_host_new_signup'
+  }
+};
+
+// Email helper functions
+const emailHelpers = {
+  getSlotLabel(party, slotId) {
+    if (!slotId) return 'General attendance';
+    const slots = typeof party.slots === 'string' ? JSON.parse(party.slots) : (party.slots || []);
+    const slot = slots.find(s => s.id === slotId);
+    return slot ? slot.label : 'General attendance';
+  },
+
+  async sendGuestConfirmation(guest, party, seriesTitle) {
+    // Only send if EmailJS is configured
+    if (EMAILJS_CONFIG.serviceId === 'YOUR_SERVICE_ID') {
+      console.log('EmailJS not configured yet - skipping confirmation email');
+      return;
+    }
+
+    const slotInfo = this.getSlotLabel(party, guest.slotId);
+    
+    const templateParams = {
+      to_email: guest.email,
+      guest_name: guest.name,
+      event_title: party.title || 'Event',
+      event_date: formatDate(party.date),
+      event_location: party.location,
+      host_name: party.host,
+      host_email: party.host_email,
+      slot_info: slotInfo,
+      dietary_restrictions: guest.dietary || 'None specified',
+      series_name: seriesTitle
+    };
+
+    try {
+      await emailjs.send(
+        EMAILJS_CONFIG.serviceId,
+        EMAILJS_CONFIG.templates.guestConfirmation,
+        templateParams,
+        EMAILJS_CONFIG.publicKey
+      );
+      console.log('✓ Confirmation email sent to:', guest.email);
+    } catch (error) {
+      console.error('✗ Failed to send confirmation email:', error);
+    }
+  },
+
+  async sendHostNewSignup(guest, party, seriesTitle) {
+    // Only send if EmailJS is configured
+    if (EMAILJS_CONFIG.serviceId === 'YOUR_SERVICE_ID') {
+      console.log('EmailJS not configured yet - skipping host notification');
+      return;
+    }
+
+    const slotInfo = this.getSlotLabel(party, guest.slotId);
+    
+    const templateParams = {
+      to_email: party.host_email,
+      host_name: party.host,
+      event_title: party.title || 'Event',
+      event_date: formatDate(party.date),
+      guest_name: guest.name,
+      guest_email: guest.email,
+      slot_info: slotInfo,
+      dietary_restrictions: guest.dietary || 'None',
+      current_count: party.guests.length,
+      max_guests: party.max_guests,
+      spots_remaining: party.max_guests - party.guests.length
+    };
+
+    try {
+      await emailjs.send(
+        EMAILJS_CONFIG.serviceId,
+        EMAILJS_CONFIG.templates.hostNewSignup,
+        templateParams,
+        EMAILJS_CONFIG.publicKey
+      );
+      console.log('✓ Host notification sent to:', party.host_email);
+    } catch (error) {
+      console.error('✗ Failed to send host notification:', error);
+    }
+  }
+};
+
 // API helper functions
 const api = {
   async getSeries() {
@@ -393,6 +484,7 @@ const DinnerPartyManager = () => {
                 onEdit={() => setEditingParty(party)}
                 onUpdate={saveParty}
                 onDuplicate={duplicateParty}
+                seriesTitle={currentSeries.title}
               />
             ))
           )}
@@ -857,7 +949,7 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
 // NEW PartyCard Component with Multi-Slot Signup and Duplicate Button
 // Replace the existing PartyCard in app-neon.js with this version
 
-const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate }) => {
+const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle }) => {
   const [showSignup, setShowSignup] = useState(false);
   const [signupForm, setSignupForm] = useState({ 
     email: '', 
@@ -918,32 +1010,26 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate }) => {
       }
     }
 
-    // Create a guest entry for each selected slot
-    const newGuests = signupForm.selectedSlots.map(slotId => ({
-      id: `${Date.now()}-${slotId}`,
-      name: signupForm.slotNames[slotId],
-      email: signupForm.email,
-      dietary: signupForm.dietary,
-      slotId: slotId,
-      signedUpAt: new Date().toISOString()
-    }));
+    // Check if at least one slot is selected
+    if (signupForm.selectedSlots.length === 0) {
+      alert('Please select at least one slot');
+      return;
+    }
 
-    // If no slots selected, create one general attendance guest
-    if (newGuests.length === 0) {
-      if (!signupForm.generalName || !signupForm.generalName.trim()) {
-        alert('Please enter your name');
-        return;
-      }
+    // Create a guest entry for each selected slot
+    const newGuests = signupForm.selectedSlots.map(slotId => {
+      // General slots have IDs like "general-0", "general-1"
+      const isGeneralSlot = slotId.startsWith('general-');
       
-      newGuests.push({
-        id: Date.now().toString(),
-        name: signupForm.generalName,
+      return {
+        id: `${Date.now()}-${slotId}`,
+        name: signupForm.slotNames[slotId],
         email: signupForm.email,
         dietary: signupForm.dietary,
-        slotId: null,
+        slotId: isGeneralSlot ? null : slotId, // null for general attendance
         signedUpAt: new Date().toISOString()
-      });
-    }
+      };
+    });
 
     const updatedParty = {
       ...party,
@@ -952,9 +1038,19 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate }) => {
 
     try {
       await onUpdate(updatedParty);
+      
+      // Send confirmation emails to each new guest and notification to host
+      for (const guest of newGuests) {
+        // Send confirmation to guest
+        await emailHelpers.sendGuestConfirmation(guest, updatedParty, seriesTitle);
+        
+        // Send notification to host
+        await emailHelpers.sendHostNewSignup(guest, updatedParty, seriesTitle);
+      }
+      
       setSignupForm({ email: '', dietary: '', selectedSlots: [], slotNames: {}, generalName: '' });
       setShowSignup(false);
-      alert('Successfully signed up! You\'ll receive reminders before the event.');
+      alert('Successfully signed up! You\'ll receive a confirmation email shortly.');
     } catch (error) {
       console.error('Signup error:', error);
       alert('Failed to sign up. Please try again.');
@@ -1119,54 +1215,71 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate }) => {
               <form onSubmit={handleSignup} className="bg-gray-50 p-4 rounded border border-gray-200">
                 <h5 className="font-semibold text-gray-800 mb-3">Sign Up</h5>
                 
-                {/* Multi-Slot Selection */}
-                {availableSlots.length > 0 && (
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select potluck slot(s):
-                    </label>
-                    {availableSlots.map(slot => (
-                      <div key={slot.id} className="mb-3">
+                {/* All Slots - Both Labeled and General */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select slot(s) to attend:
+                  </label>
+                  
+                  {/* Labeled slots */}
+                  {availableSlots.map(slot => (
+                    <div key={slot.id} className="mb-3">
+                      <label className="flex items-start gap-2 cursor-pointer mb-1">
+                        <input
+                          type="checkbox"
+                          checked={signupForm.selectedSlots.includes(slot.id)}
+                          onChange={() => handleSlotToggle(slot.id)}
+                          className="mt-1 w-4 h-4 text-red-700 border-gray-300 rounded focus:ring-red-700"
+                        />
+                        <span className="text-sm font-medium text-gray-700">{slot.label}</span>
+                      </label>
+                      {signupForm.selectedSlots.includes(slot.id) && (
+                        <input
+                          type="text"
+                          placeholder="Name for this slot *"
+                          value={signupForm.slotNames[slot.id] || ''}
+                          onChange={(e) => handleSlotNameChange(slot.id, e.target.value)}
+                          className="ml-6 w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                          required
+                        />
+                      )}
+                    </div>
+                  ))}
+                  
+                  {/* General attendance slots */}
+                  {Array.from({ length: generalSlotsAvailable }, (_, i) => {
+                    const generalSlotId = `general-${i}`;
+                    return (
+                      <div key={generalSlotId} className="mb-3">
                         <label className="flex items-start gap-2 cursor-pointer mb-1">
                           <input
                             type="checkbox"
-                            checked={signupForm.selectedSlots.includes(slot.id)}
-                            onChange={() => handleSlotToggle(slot.id)}
+                            checked={signupForm.selectedSlots.includes(generalSlotId)}
+                            onChange={() => handleSlotToggle(generalSlotId)}
                             className="mt-1 w-4 h-4 text-red-700 border-gray-300 rounded focus:ring-red-700"
                           />
-                          <span className="text-sm font-medium text-gray-700">{slot.label}</span>
+                          <span className="text-sm font-medium text-gray-700">
+                            General Attendance {generalSlotsAvailable > 1 ? `(Slot ${i + 1})` : ''}
+                          </span>
                         </label>
-                        {signupForm.selectedSlots.includes(slot.id) && (
+                        {signupForm.selectedSlots.includes(generalSlotId) && (
                           <input
                             type="text"
-                            placeholder="Name for this slot *"
-                            value={signupForm.slotNames[slot.id] || ''}
-                            onChange={(e) => handleSlotNameChange(slot.id, e.target.value)}
+                            placeholder="Your name *"
+                            value={signupForm.slotNames[generalSlotId] || ''}
+                            onChange={(e) => handleSlotNameChange(generalSlotId, e.target.value)}
                             className="ml-6 w-full border border-gray-300 rounded px-3 py-2 text-sm"
                             required
                           />
                         )}
                       </div>
-                    ))}
-                    {generalSlotsAvailable > 0 && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        Leave all unchecked for general attendance (no specific slot)
-                      </p>
-                    )}
-                  </div>
-                )}
-                
-                {/* Name field for general attendance (no slots or none selected) */}
-                {(availableSlots.length === 0 || signupForm.selectedSlots.length === 0) && (
-                  <input
-                    type="text"
-                    placeholder="Your name *"
-                    value={signupForm.generalName}
-                    onChange={(e) => setSignupForm({ ...signupForm, generalName: e.target.value })}
-                    className="w-full border border-gray-300 rounded px-3 py-2 mb-2"
-                    required
-                  />
-                )}
+                    );
+                  })}
+                  
+                  {(availableSlots.length === 0 && generalSlotsAvailable === 0) && (
+                    <p className="text-sm text-gray-500">No slots available</p>
+                  )}
+                </div>
                 
                 <input
                   type="email"
