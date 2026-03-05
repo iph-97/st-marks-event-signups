@@ -186,10 +186,26 @@ const DinnerPartyManager = () => {
 
   const saveParty = async (party) => {
     try {
-      if (party.id) {
-        await api.updateParty(party);
+      // Transform snake_case database fields to camelCase for API
+      const partyData = {
+        id: party.id,
+        seriesId: party.series_id || party.seriesId,
+        title: party.title,
+        date: party.date,
+        host: party.host,
+        hostEmail: party.host_email || party.hostEmail,
+        location: party.location,
+        maxGuests: party.max_guests || party.maxGuests,
+        kidFriendly: party.kid_friendly !== undefined ? party.kid_friendly : party.kidFriendly,
+        description: party.description,
+        guests: party.guests,
+        slots: party.slots
+      };
+
+      if (partyData.id) {
+        await api.updateParty(partyData);
       } else {
-        await api.createParty(party);
+        await api.createParty(partyData);
       }
       await loadParties(currentSeries.id);
     } catch (error) {
@@ -847,7 +863,8 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate }) => {
     email: '', 
     dietary: '',
     selectedSlots: [],  // Array of slot IDs
-    slotNames: {}       // {slotId: "Person Name"}
+    slotNames: {},      // {slotId: "Person Name"}
+    generalName: ''     // For general attendance (no slot)
   });
 
   const partyDate = new Date(party.date);
@@ -913,12 +930,14 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate }) => {
 
     // If no slots selected, create one general attendance guest
     if (newGuests.length === 0) {
-      const generalName = prompt('Please enter your name:');
-      if (!generalName) return;
+      if (!signupForm.generalName || !signupForm.generalName.trim()) {
+        alert('Please enter your name');
+        return;
+      }
       
       newGuests.push({
         id: Date.now().toString(),
-        name: generalName,
+        name: signupForm.generalName,
         email: signupForm.email,
         dietary: signupForm.dietary,
         slotId: null,
@@ -931,8 +950,16 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate }) => {
       guests: [...guests, ...newGuests]
     };
 
-    await onUpdate(updatedParty);
-    setSignupForm({ email: '', dietary: '', selectedSlots: [], slotNames: {} });
+    try {
+      await onUpdate(updatedParty);
+      setSignupForm({ email: '', dietary: '', selectedSlots: [], slotNames: {}, generalName: '' });
+      setShowSignup(false);
+      alert('Successfully signed up! You\'ll receive reminders before the event.');
+    } catch (error) {
+      console.error('Signup error:', error);
+      alert('Failed to sign up. Please try again.');
+    }
+  };
     setShowSignup(false);
     alert('Successfully signed up! You\'ll receive reminders before the event.');
   };
@@ -1132,6 +1159,18 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate }) => {
                   </div>
                 )}
                 
+                {/* Name field for general attendance (no slots or none selected) */}
+                {(availableSlots.length === 0 || signupForm.selectedSlots.length === 0) && (
+                  <input
+                    type="text"
+                    placeholder="Your name *"
+                    value={signupForm.generalName}
+                    onChange={(e) => setSignupForm({ ...signupForm, generalName: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 mb-2"
+                    required
+                  />
+                )}
+                
                 <input
                   type="email"
                   placeholder="Email (for all people) *"
@@ -1160,7 +1199,7 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate }) => {
                     type="button"
                     onClick={() => {
                       setShowSignup(false);
-                      setSignupForm({ email: '', dietary: '', selectedSlots: [], slotNames: {} });
+                      setSignupForm({ email: '', dietary: '', selectedSlots: [], slotNames: {}, generalName: '' });
                     }}
                     className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition"
                   >
