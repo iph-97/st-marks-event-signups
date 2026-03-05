@@ -960,9 +960,6 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate }) => {
       alert('Failed to sign up. Please try again.');
     }
   };
-    setShowSignup(false);
-    alert('Successfully signed up! You\'ll receive reminders before the event.');
-  };
 
   const removeGuest = async (guestId) => {
     if (!confirm('Remove this guest from the event?')) return;
