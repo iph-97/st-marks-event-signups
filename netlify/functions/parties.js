@@ -52,11 +52,12 @@ exports.handler = async (event, context) => {
       const data = JSON.parse(event.body);
       const result = await client.query(
         `INSERT INTO parties 
-         (series_id, date, host, host_email, location, max_guests, kid_friendly, description, guests, created_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) 
+         (series_id, title, date, host, host_email, location, max_guests, kid_friendly, description, guests, slots, created_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW()) 
          RETURNING *`,
         [
           data.seriesId,
+          data.title || null,
           data.date,
           data.host,
           data.hostEmail,
@@ -64,7 +65,8 @@ exports.handler = async (event, context) => {
           data.maxGuests,
           data.kidFriendly || false,
           data.description || '',
-          JSON.stringify(data.guests || [])
+          JSON.stringify(data.guests || []),
+          JSON.stringify(data.slots || [])
         ]
       );
       return {
@@ -74,16 +76,17 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // PUT - Update party (including guest list)
+    // PUT - Update party (including guest list and slots)
     if (event.httpMethod === 'PUT') {
       const data = JSON.parse(event.body);
       const result = await client.query(
         `UPDATE parties 
-         SET date = $1, host = $2, host_email = $3, location = $4, 
-             max_guests = $5, kid_friendly = $6, description = $7, guests = $8
-         WHERE id = $9
+         SET title = $1, date = $2, host = $3, host_email = $4, location = $5, 
+             max_guests = $6, kid_friendly = $7, description = $8, guests = $9, slots = $10
+         WHERE id = $11
          RETURNING *`,
         [
+          data.title || null,
           data.date,
           data.host,
           data.hostEmail,
@@ -92,6 +95,7 @@ exports.handler = async (event, context) => {
           data.kidFriendly || false,
           data.description || '',
           JSON.stringify(data.guests || []),
+          JSON.stringify(data.slots || []),
           data.id
         ]
       );

@@ -52,10 +52,11 @@ const api = {
     const response = await fetch(`/.netlify/functions/parties?seriesId=${seriesId}`);
     if (!response.ok) throw new Error('Failed to fetch parties');
     const parties = await response.json();
-    // Parse guests JSON back to array
+    // Parse JSON fields back to arrays/objects
     return parties.map(p => ({
       ...p,
-      guests: typeof p.guests === 'string' ? JSON.parse(p.guests) : p.guests
+      guests: typeof p.guests === 'string' ? JSON.parse(p.guests) : (p.guests || []),
+      slots: typeof p.slots === 'string' ? JSON.parse(p.slots) : (p.slots || [])
     }));
   },
 
@@ -69,7 +70,8 @@ const api = {
     const party = await response.json();
     return {
       ...party,
-      guests: typeof party.guests === 'string' ? JSON.parse(party.guests) : party.guests
+      guests: typeof party.guests === 'string' ? JSON.parse(party.guests) : (party.guests || []),
+      slots: typeof party.slots === 'string' ? JSON.parse(party.slots) : (party.slots || [])
     };
   },
 
@@ -83,7 +85,8 @@ const api = {
     const party = await response.json();
     return {
       ...party,
-      guests: typeof party.guests === 'string' ? JSON.parse(party.guests) : party.guests
+      guests: typeof party.guests === 'string' ? JSON.parse(party.guests) : (party.guests || []),
+      slots: typeof party.slots === 'string' ? JSON.parse(party.slots) : (party.slots || [])
     };
   },
 
@@ -583,6 +586,19 @@ const SeriesCard = ({ series, onSelect, onEdit, onDelete }) => {
 };
 
 const PartyForm = ({ party, series, onSave, onCancel }) => {
+  // Ensure slots is always an array
+  const parseSlots = (slots) => {
+    if (!slots) return [];
+    if (typeof slots === 'string') {
+      try {
+        return JSON.parse(slots);
+      } catch {
+        return [];
+      }
+    }
+    return Array.isArray(slots) ? slots : [];
+  };
+
   const [formData, setFormData] = useState({
     title: party?.title || '',
     date: party?.date || '',
@@ -592,7 +608,7 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
     maxGuests: party?.max_guests || 8,
     kidFriendly: party?.kid_friendly || false,
     description: party?.description || '',
-    slots: party?.slots || []
+    slots: parseSlots(party?.slots)
   });
 
   const addSlot = () => {
