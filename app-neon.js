@@ -288,6 +288,7 @@ const DinnerPartyManager = () => {
         location: party.location,
         maxGuests: party.max_guests || party.maxGuests,
         kidFriendly: party.kid_friendly !== undefined ? party.kid_friendly : party.kidFriendly,
+        isPotluck: party.is_potluck !== undefined ? party.is_potluck : party.isPotluck,
         description: party.description,
         guests: party.guests,
         slots: party.slots
@@ -715,6 +716,7 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
     location: party?.location || '',
     maxGuests: party?.max_guests || 8,
     kidFriendly: party?.kid_friendly || false,
+    isPotluck: party?.is_potluck || false,
     description: party?.description || '',
     slots: parseSlots(party?.slots)
   });
@@ -868,11 +870,25 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
         </label>
       </div>
 
-      {/* Slot Management Section */}
+      <div className="mb-4">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={formData.isPotluck}
+            onChange={(e) => setFormData({ ...formData, isPotluck: e.target.checked })}
+            className="w-4 h-4 text-red-700 border-gray-300 rounded focus:ring-red-700"
+          />
+          <span className="text-sm font-medium text-gray-700">
+            This is a potluck (guests will bring food/drinks)
+          </span>
+        </label>
+      </div>
+
+      {/* Slot Label Management Section */}
       <div className="mb-4 p-4 bg-gray-50 rounded border border-gray-200">
         <div className="flex justify-between items-center mb-2">
           <label className="block text-sm font-medium text-gray-700">
-            Potluck Slots (Optional)
+            Slot Labels (Optional)
           </label>
           <button
             type="button"
@@ -880,11 +896,11 @@ const PartyForm = ({ party, series, onSave, onCancel }) => {
             className="text-sm text-red-700 hover:text-red-800 flex items-center gap-1"
           >
             <Plus size={16} />
-            Add Slot
+            Add Label
           </button>
         </div>
         <p className="text-xs text-gray-500 mb-3">
-          Create labeled slots for potluck contributions (e.g., "Main Dish", "Salad", "Drinks")
+          Add optional labels for specific roles or seats (e.g., "Table 1", "Couple", "Single")
         </p>
 
         {formData.slots.length === 0 ? (
@@ -954,6 +970,7 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
   const [signupForm, setSignupForm] = useState({ 
     email: '', 
     dietary: '',
+    bringing: '',      // What they're bringing if potluck
     selectedSlots: [],  // Array of slot IDs
     slotNames: {},      // {slotId: "Person Name"}
     generalName: ''     // For general attendance (no slot)
@@ -1026,6 +1043,7 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
         name: signupForm.slotNames[slotId],
         email: signupForm.email,
         dietary: signupForm.dietary,
+        bringing: party.is_potluck ? signupForm.bringing : '', // Only if potluck
         slotId: isGeneralSlot ? null : slotId, // null for general attendance
         signedUpAt: new Date().toISOString()
       };
@@ -1048,7 +1066,7 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
         await emailHelpers.sendHostNewSignup(guest, updatedParty, seriesTitle);
       }
       
-      setSignupForm({ email: '', dietary: '', selectedSlots: [], slotNames: {}, generalName: '' });
+      setSignupForm({ email: '', dietary: '', bringing: '', selectedSlots: [], slotNames: {}, generalName: '' });
       setShowSignup(false);
       alert('Successfully signed up! You\'ll receive a confirmation email shortly.');
     } catch (error) {
@@ -1118,9 +1136,14 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
               👶 Kid-friendly
             </span>
           )}
+          {party.is_potluck && (
+            <span className="bg-white bg-opacity-20 px-2 py-1 rounded text-xs font-medium">
+              🍽️ Potluck
+            </span>
+          )}
           {slots.length > 0 && (
             <span className="bg-white bg-opacity-20 px-2 py-1 rounded text-xs font-medium">
-              🍽️ Potluck slots
+              🏷️ Labeled slots
             </span>
           )}
         </div>
@@ -1184,6 +1207,9 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
                         )}
                       </p>
                       <p className="text-sm text-gray-500">{guest.email}</p>
+                      {guest.bringing && (
+                        <p className="text-sm text-green-600 mt-1">Bringing: {guest.bringing}</p>
+                      )}
                       {guest.dietary && (
                         <p className="text-sm text-gray-600 mt-1">Dietary: {guest.dietary}</p>
                       )}
@@ -1290,6 +1316,17 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
                   required
                 />
                 
+                {party.is_potluck && (
+                  <input
+                    type="text"
+                    placeholder="What are you bringing? *"
+                    value={signupForm.bringing}
+                    onChange={(e) => setSignupForm({ ...signupForm, bringing: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 mb-2"
+                    required
+                  />
+                )}
+                
                 <input
                   type="text"
                   placeholder="Dietary restrictions (optional)"
@@ -1309,7 +1346,7 @@ const PartyCard = ({ party, onDelete, onEdit, onUpdate, onDuplicate, seriesTitle
                     type="button"
                     onClick={() => {
                       setShowSignup(false);
-                      setSignupForm({ email: '', dietary: '', selectedSlots: [], slotNames: {}, generalName: '' });
+                      setSignupForm({ email: '', dietary: '', bringing: '', selectedSlots: [], slotNames: {}, generalName: '' });
                     }}
                     className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition"
                   >

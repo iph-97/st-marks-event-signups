@@ -52,8 +52,8 @@ exports.handler = async (event, context) => {
       const data = JSON.parse(event.body);
       const result = await client.query(
         `INSERT INTO parties 
-         (series_id, title, date, host, host_email, location, max_guests, kid_friendly, description, guests, slots, created_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW()) 
+         (series_id, title, date, host, host_email, location, max_guests, kid_friendly, is_potluck, description, guests, slots, created_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW()) 
          RETURNING *`,
         [
           data.seriesId,
@@ -64,6 +64,7 @@ exports.handler = async (event, context) => {
           data.location,
           data.maxGuests,
           data.kidFriendly || false,
+          data.isPotluck || false,
           data.description || '',
           JSON.stringify(data.guests || []),
           JSON.stringify(data.slots || [])
@@ -82,8 +83,8 @@ exports.handler = async (event, context) => {
       const result = await client.query(
         `UPDATE parties 
          SET title = $1, date = $2, host = $3, host_email = $4, location = $5, 
-             max_guests = $6, kid_friendly = $7, description = $8, guests = $9, slots = $10
-         WHERE id = $11
+             max_guests = $6, kid_friendly = $7, is_potluck = $8, description = $9, guests = $10, slots = $11
+         WHERE id = $12
          RETURNING *`,
         [
           data.title || null,
@@ -93,6 +94,7 @@ exports.handler = async (event, context) => {
           data.location,
           data.maxGuests,
           data.kidFriendly || false,
+          data.isPotluck || false,
           data.description || '',
           JSON.stringify(data.guests || []),
           JSON.stringify(data.slots || []),
